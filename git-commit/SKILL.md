@@ -89,15 +89,18 @@ Analyze the diff to determine:
 - **Type**: What kind of change is this?
 - **Scope**: What area/module is affected?
 - **Description**: One-line summary of what changed (present tense, imperative mood, <72 chars)
+- **Language**: Write the messages always use Chinese.
 
 ### 4. Execute Commit
 
+If a GPG verification failure occurs during submission, first provide the command to the user; there is no need to add the `--no-gpg-sign` parameter.
+
 ```bash
 # Single line
-git commit -m "<type>[scope]: <description>"
+git commit -s -m "<type>[scope]: <description>"
 
 # Multi-line with body/footer
-git commit -m "$(cat <<'EOF'
+git commit -s -m "$(cat <<'EOF'
 <type>[scope]: <description>
 
 <optional body>
