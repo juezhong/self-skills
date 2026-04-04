@@ -11,7 +11,7 @@ Make commits that are easy to review and safe to ship:
 - commits are logically scoped (split when needed)
 - commit messages describe what changed and why
 - All commit commands must include `-s` to ensure a Signed-off-by line is added.
-- Prefer `git commit -s -v` for normal commits, especially when using a multi-line commit message.
+- Must `git commit -s -v` for normal commits, especially when using a multi-line commit message.
 - Use `git commit -s -m "..."` only when a single sentence is enough to explain the change clearly.
 
 ## Inputs to ask for (if missing)
@@ -48,7 +48,7 @@ Make commits that are easy to review and safe to ship:
      - blank line
      - body (what/why, not implementation diary)
      - footer (BREAKING CHANGE) if needed
-   - Prefer an editor for multi-line messages: `git commit -v`
+   - Must an editor for multi-line messages: `git commit -v`
    - The short summary should cover all files included in this commit.
 7) Handle commit submission issues
    - If a GPG verification/signing failure occurs during commit submission, first provide the exact commit command to the user.
