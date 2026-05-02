@@ -1,17 +1,16 @@
 > 自用 Skills 备份
 
-> Used by Codex through 'npx skill' installed.
-
 ## 环境初始化
 
 在新机器上恢复技能环境：
 
-### 1. 插件市场
+### 1. 手动添加的插件市场
 
-| 市场 | 注册命令 | 说明 |
-|------|----------|------|
-| `claude-plugins-official` | 无需注册 | 系统内置官方市场 |
-| `anthropic-agent-skills` | `/plugin marketplace add anthropics/skills` | Anthropic 示例技能市场 |
+`claude-plugins-official` 为系统内置官方市场，无需手动注册。以下为额外添加的市场：
+
+| 市场 | 注册命令 |
+|------|----------|
+| `anthropic-agent-skills` | `/plugin marketplace add anthropics/skills` |
 
 ### 2. 已安装插件
 
