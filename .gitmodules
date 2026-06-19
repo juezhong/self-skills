@@ -1,3 +1,6 @@
 [submodule "submodules/mattpocock-skills"]
 	path = submodules/mattpocock-skills
 	url = https://github.com/mattpocock/skills
+[submodule "submodules/agent-toolkit"]
+	path = submodules/agent-toolkit
+	url = https://github.com/softaworks/agent-toolkit
