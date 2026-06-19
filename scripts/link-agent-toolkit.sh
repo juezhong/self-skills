@@ -64,6 +64,8 @@ if [ "${1:-}" = "--unlink" ]; then
     exit 0
 fi
 
+is_skill_dir() { [ -d "$1" ] && [ -f "$1/SKILL.md" ]; }
+
 if [ ! -d "$SUBMODULE_PATH/skills" ]; then
     echo "错误: 子模块未初始化，请先执行: git submodule update --init $SUBMODULE_PATH"
     exit 1
@@ -83,6 +85,7 @@ SUBMODULE_SKILLS="submodules/agent-toolkit/skills"
 # ---- 全量模式 ----
 if [ "$MODE" = "full" ]; then
     for dir in "$SUBMODULE_SKILLS"/*/; do
+        is_skill_dir "$dir" || continue
         name="$(basename "$dir")"
         if [ -e "$name" ] || [ -L "$name" ]; then
             rm -rf "$name"
@@ -97,7 +100,7 @@ fi
 if [ "$MODE" = "selective" ]; then
     for skill in "$@"; do
         skill_dir="$SUBMODULE_SKILLS/${skill}"
-        if [ ! -d "$skill_dir" ]; then
+        if ! is_skill_dir "$skill_dir"; then
             echo "  错误: 技能 '$skill' 在子模块中不存在，跳过"
             continue
         fi

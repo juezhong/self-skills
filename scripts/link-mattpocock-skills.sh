@@ -72,6 +72,9 @@ if [ "${1:-}" = "--unlink" ]; then
 fi
 
 # 检查子模块是否就绪
+# 判定技能目录的标准：同时满足【是目录】且【包含 SKILL.md】
+is_skill_dir() { [ -d "$1" ] && [ -f "$1/SKILL.md" ]; }
+
 if [ ! -d "$SUBMODULE_PATH/skills" ]; then
     echo "错误: 子模块未初始化，请先执行: git submodule update --init $SUBMODULE_PATH"
     exit 1
@@ -100,6 +103,7 @@ if [ "$MODE" = "full" ]; then
         fi
 
         for dir in "$sub_path"/*/; do
+            is_skill_dir "$dir" || continue
             local name
             name="$(basename "$dir")"
 
@@ -125,6 +129,7 @@ if [ "$MODE" = "selective" ]; then
         sub_path="submodules/mattpocock-skills/skills/${category}"
         if [ -d "$sub_path" ]; then
             for dir in "$sub_path"/*/; do
+                is_skill_dir "$dir" || continue
                 ALL_AVAILABLE+=("$(basename "$dir")")
             done
         fi
@@ -147,7 +152,7 @@ if [ "$MODE" = "selective" ]; then
         # 找到技能的实际路径
         for category in engineering productivity; do
             skill_dir="submodules/mattpocock-skills/skills/${category}/${skill}"
-            if [ -d "$skill_dir" ]; then
+            if is_skill_dir "$skill_dir"; then
                 if [ -e "$skill" ] || [ -L "$skill" ]; then
                     rm -rf "$skill"
                 fi

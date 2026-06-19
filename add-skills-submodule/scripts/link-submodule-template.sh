@@ -39,6 +39,7 @@ if [ "${1:-}" = "--unlink" ]; then
     if [ $removed -eq 0 ] && [ -d "$SUBMODULE_PATH/skills" ]; then
         echo "  gitignore 中无记录，扫描子模块目录..."
         for dir in "$SUBMODULE_PATH/skills"/*/; do
+            is_skill_dir "$dir" || continue
             name="$(basename "$dir")"
             if [ -L "$name" ]; then
                 target=$(readlink "$name")
@@ -78,6 +79,9 @@ echo "=== 创建软链接（模式: $MODE）==="
 
 SKILL_NAMES=()
 
+# 判定技能目录的标准：同时满足【是目录】且【包含 SKILL.md】
+is_skill_dir() { [ -d "$1" ] && [ -f "$1/SKILL.md" ]; }
+
 # ═══════════════════════════════════════════════════════
 # 模式 A：扁平结构（skills/ 下直接是技能目录）
 # 示例：agent-toolkit
@@ -86,6 +90,7 @@ SKILL_NAMES=()
 #
 # if [ "$MODE" = "full" ]; then
 #     for dir in "$SUBMODULE_SKILLS"/*/; do
+#         is_skill_dir "$dir" || continue
 #         name="$(basename "$dir")"
 #         if [ -e "$name" ] || [ -L "$name" ]; then rm -rf "$name"; fi
 #         ln -s "$dir" "$name"; SKILL_NAMES+=("$name"); echo "  $name -> $dir"
@@ -95,7 +100,7 @@ SKILL_NAMES=()
 # if [ "$MODE" = "selective" ]; then
 #     for skill in "$@"; do
 #         skill_dir="$SUBMODULE_SKILLS/${skill}"
-#         if [ ! -d "$skill_dir" ]; then echo "  错误: 技能 '$skill' 不存在，跳过"; continue; fi
+#         if ! is_skill_dir "$skill_dir"; then echo "  错误: 技能 '$skill' 不存在，跳过"; continue; fi
 #         if [ -e "$skill" ] || [ -L "$skill" ]; then rm -rf "$skill"; fi
 #         ln -s "$skill_dir" "$skill"; SKILL_NAMES+=("$skill"); echo "  $skill -> $skill_dir"
 #     done
@@ -113,6 +118,7 @@ if [ "$MODE" = "full" ]; then
         local sub_path="${SUBMODULE_SKILLS}/${category}"
         if [ ! -d "$sub_path" ]; then echo "  [跳过] $category"; return; fi
         for dir in "$sub_path"/*/; do
+            is_skill_dir "$dir" || continue
             local name; name="$(basename "$dir")"
             if [ -e "$name" ] || [ -L "$name" ]; then rm -rf "$name"; fi
             ln -s "$dir" "$name"; SKILL_NAMES+=("$name"); echo "  $name -> $dir"
@@ -123,26 +129,18 @@ if [ "$MODE" = "full" ]; then
 fi
 
 if [ "$MODE" = "selective" ]; then
-    # 先收集所有可用技能（用于校验）
-    ALL_AVAILABLE=()
-    for category in engineering productivity; do
-        sub_path="${SUBMODULE_SKILLS}/${category}"
-        if [ -d "$sub_path" ]; then
-            for dir in "$sub_path"/*/; do ALL_AVAILABLE+=("$(basename "$dir")"); done
-        fi
-    done
     for skill in "$@"; do
         found=false
-        for a in "${ALL_AVAILABLE[@]}"; do if [ "$skill" = "$a" ]; then found=true; break; fi; done
-        if ! $found; then echo "  错误: 技能 '$skill' 不存在，跳过"; continue; fi
         for category in engineering productivity; do
             skill_dir="${SUBMODULE_SKILLS}/${category}/${skill}"
-            if [ -d "$skill_dir" ]; then
+            if is_skill_dir "$skill_dir"; then
+                found=true
                 if [ -e "$skill" ] || [ -L "$skill" ]; then rm -rf "$skill"; fi
                 ln -s "$skill_dir" "$skill"; SKILL_NAMES+=("$skill"); echo "  $skill -> $skill_dir"
                 break
             fi
         done
+        if ! $found; then echo "  错误: 技能 '$skill' 不存在，跳过"; continue; fi
     done
 fi
 
