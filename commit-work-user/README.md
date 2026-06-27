@@ -51,15 +51,20 @@ Automatically identifies when to split commits by:
 - Tests vs production code
 - Dependency bumps vs behavior changes
 
-### Conventional Commits Format
+### Structured Commit Messages
 
-All commits follow the standard:
+All commits follow the mandatory template:
 ```
-type(scope): short summary
+type(scope): summary
 
-Detailed body explaining what changed and why.
+What:
+- ...
 
-BREAKING CHANGE: if applicable
+Why:
+- ...
+
+Influence:
+- ...
 ```
 
 ### Safety Checks
@@ -86,10 +91,15 @@ git status
 git diff
 git add src/api/auth.js
 git diff --cached
-git commit -m "fix(auth): resolve token expiration edge case
+git commit -s -m "fix(auth): resolve token expiration edge case" \
+  -m "What:
+- Add 5-second grace period to token expiry validation
 
-Previously tokens would fail validation within 1 second of expiry
-due to clock skew. Now includes 5-second grace period."
+Why:
+- Tokens failed validation within 1 second of expiry due to clock skew
+
+Influence:
+- Fewer spurious auth failures near token boundary"
 ```
 
 ### Example 2: Splitting Mixed Changes
@@ -98,9 +108,9 @@ due to clock skew. Now includes 5-second grace period."
 # User has: formatting changes + new feature + test updates
 
 # Skill creates 3 commits:
-# Commit 1: chore: format code with prettier
-# Commit 2: feat(api): add user profile endpoint
-# Commit 3: test: add coverage for profile endpoint
+# Commit 1: chore: format code with prettier (+ What/Why/Influence)
+# Commit 2: feat(api): add user profile endpoint (+ What/Why/Influence)
+# Commit 3: test: add coverage for profile endpoint (+ What/Why/Influence)
 
 # Uses git add -p to stage selectively
 ```
@@ -113,12 +123,12 @@ due to clock skew. Now includes 5-second grace period."
 git add -p src/components/Header.js
 # Stages only bugfix hunks for first commit
 
-git commit -m "fix(ui): correct mobile menu z-index"
+git commit -s -m "fix(ui): correct mobile menu z-index" -m "What/Why/Influence..."
 
 git add src/components/Header.js
 # Stages refactor hunks for second commit
 
-git commit -m "refactor(ui): extract menu logic to custom hook"
+git commit -s -m "refactor(ui): extract menu logic to custom hook" -m "What/Why/Influence..."
 ```
 
 ## Inputs
@@ -153,7 +163,6 @@ After running, the skill provides:
 
 ## Related Resources
 
-- See `references/commit-message-template.md` for message templates
 - Uses Conventional Commits specification: https://www.conventionalcommits.org/
 - Integrates with standard git workflow and hooks
 
