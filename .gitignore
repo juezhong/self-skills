@@ -3,6 +3,7 @@
 # === 技能软链接 begin ===
 # --- mattpocock-skills begin ---
 ask-matt
+code-review
 codebase-design
 diagnosing-bugs
 domain-modeling
@@ -13,13 +14,18 @@ handoff
 implement
 improve-codebase-architecture
 prototype
+research
 resolving-merge-conflicts
 setup-matt-pocock-skills
 tdd
 teach
-to-issues
-to-prd
+to-questionnaire
+to-spec
+to-tickets
 triage
-writing-great-skills
+wait-what
+wayfinder
+wizard
+writing-for-agents
 # --- mattpocock-skills end ---
 # === 技能软链接 end ===
