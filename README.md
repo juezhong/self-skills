@@ -26,6 +26,30 @@ for f in scripts/link-*.sh; do [ -f "$f" ] && bash "$f"; done
 - 在项目根目录创建技能软链接
 - 更新 `.gitignore`（所有脚本共用同一个托管区块，互不干扰）
 
+`mattpocock-skills` 的 `.sh` 是兼容入口和虚拟环境启动器，实际实现位于
+`scripts/link-mattpocock-skills.py`。它会优先通过 `uv venv .venv` 创建当前仓库的
+Python 3 虚拟环境；没有 `uv`（或创建失败）时，回退到 `python3 -m venv .venv`，再使用
+`.venv/bin/python` 执行实现。该 Python 脚本遵循子模块上游安装器的技能发现规则：递归发现
+`SKILL.md`，并排除 `deprecated`、`misc`、`node_modules`；本仓库额外排除
+`in-progress`。
+
+它不会直接执行 `submodules/mattpocock-skills/scripts/link-skills.sh`：上游脚本同时管理
+`~/.agents/skills` 和 `~/.claude/skills`，而本仓库允许后者软链接到前者。包装层只管理当前
+仓库根目录中的技能链接及本仓库的 `.gitignore`，因此不会与该目录结构冲突。
+
+无参数运行时，它是与上游一致的全量安装器：刷新每个上游“已推广”技能的链接，并重建
+`.gitignore` 中 `mattpocock-skills` 的托管区块。除不安装 `in-progress` 技能外，其链接
+发现规则与上游一致。全量安装不会覆盖任何已有同名路径；请先运行 `--unlink`，再重新创建
+所有链接。
+
+`--unlink` 会反向删除当前仓库根目录中、确实指向 `submodules/mattpocock-skills` 的所有
+技能软链接；它不会读取、删除或修改 `.gitignore`。这样可以移除已安装技能，但保留忽略
+规则供下次全量安装继续使用。
+
+`agent-toolkit` 使用同样的 Python 3 虚拟环境启动方式和安全重建流程：无参数全量链接全部
+`SKILL.md` 技能，`--unlink` 仅删除指向 `submodules/agent-toolkit` 的软链接且不修改
+`.gitignore`。全量链接不会覆盖已有同名路径，请先运行 `--unlink`。
+
 ### 3. 链接到 Claude Code
 
 ```bash

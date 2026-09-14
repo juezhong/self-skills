@@ -1,4 +1,5 @@
 # 技能目录软链接（由 scripts/link-*.sh 自动生成）
+.venv/
 
 # === 技能软链接 begin ===
 # --- mattpocock-skills begin ---
