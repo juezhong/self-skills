@@ -13,7 +13,6 @@ Make commits that are easy to review and safe to ship:
 - All suggested or executed commit commands must include `-S -s`: `-S` requests GPG signing and `-s` adds a Signed-off-by line.
 - Default behavior: prepare commit message file(s) and tell the user how to commit them. Do not run `git commit` unless the user explicitly asks the agent to make the commit.
 - Save message files under `./commit-message/YYYY-MM-DD/` in the current working directory. For multiple commits, save one file per commit.
-- A first-time message uses `<slug>.txt` with no version suffix. Add `-v1`, `-v2`, etc. only when the user asks to revise that same commit message; preserve the earlier file and save each revision as a new version. Different commits get distinct descriptive slugs and do not get version suffixes just because they share a date. Use `.txt` extension.
 
 ## Inputs to ask for (if missing)
 - Single commit or multiple commits? (If unsure: default to multiple small commits when there are unrelated changes.)
@@ -62,15 +61,15 @@ Make commits that are easy to review and safe to ship:
      - First line: `type(scope): summary` (Chinese summary OK, scope optional).
      - `What:` / `Why:` sections required. `Influence:` omit if none.
      - Body sections use `- ` bullets, not prose.
-   - Write the complete message (subject and body) into a UTF-8 `.txt` file at `./commit-message/YYYY-MM-DD/<slug>-vN.txt`.
+   - Write the complete message (subject and body) into a UTF-8 `.txt` file under `./commit-message/YYYY-MM-DD/`.
    - `YYYY-MM-DD` is the local current date. `<slug>` is a short filesystem-safe identifier derived from the subject; use lowercase ASCII with hyphens where practical.
-   - Check for existing files before writing. For a new commit message, choose an unused descriptive slug and omit a version suffix. When revising a previously saved message at the user's request, keep its slug, preserve the existing file, and append the next version suffix (`-v1`, then `-v2`, etc.). Do not overwrite existing files.
+   - Check for existing files before writing. For a new commit message, choose an unused descriptive slug and save `<slug>.txt`. On the first revision, rename `<slug>.txt` to `<slug>-v1.txt` and save the revised content as `<slug>-v2.txt`. On later revisions, save `<slug>-v3.txt`, `<slug>-v4.txt`, and so on. Keep the same slug for one intended commit, even if its subject changes; use a distinct slug for a different commit. Preserve earlier contents and never overwrite a versioned file.
    - Keep the message format in the file exactly as intended for the commit, including blank lines and any `What`, `Why`, and optional `Influence` sections.
    - Validate the saved file: subject follows Conventional Commits, blank line after subject, and required `What` / `Why` bullets are present.
 8) Give the user the exact commit command for each message file
    - Show the path and a command using the staged changes and the saved message file, for example:
      ```sh
-     git commit -S -s -F "./commit-message/YYYY-MM-DD/<slug>-v1.txt"
+     git commit -S -s -F "./commit-message/YYYY-MM-DD/<slug>-v2.txt"
      ```
    - If there are multiple logical commits, explain that the user must stage the corresponding changes before running each command.
    - `-S` signs the commit and `-s` adds the Signed-off-by trailer. Do not add `--no-gpg-sign` unless explicitly requested.
