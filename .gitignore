@@ -1,3 +1,6 @@
+# 提交信息保存目录
+commit-message/
+
 # 技能目录软链接（由 scripts/link-*.sh 自动生成）
 .venv/
 
