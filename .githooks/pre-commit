@@ -1,0 +1,26 @@
+#!/bin/sh
+# 提交前检查技能链接：拦住悬空链接、越界链接和 .gitignore 漂移。
+# 启用方式（一次）：git config core.hooksPath .githooks
+#
+# 没有可用解释器时打印提示并放行——链接检查不该让所有提交都失败。
+set -e
+ROOT=$(git rev-parse --show-toplevel)
+
+PYTHON_BIN=""
+for candidate in "$ROOT/.venv/Scripts/python.exe" "$ROOT/.venv/bin/python.exe"; do
+    if [ -x "$candidate" ]; then
+        PYTHON_BIN="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PYTHON_BIN" ]; then
+    echo "pre-commit: 跳过技能链接检查（没有找到 .venv 解释器）" >&2
+    exit 0
+fi
+
+if ! "$PYTHON_BIN" "$ROOT/scripts/check-skill-links.py"; then
+    echo "pre-commit: 技能链接未通过检查，提交已中止" >&2
+    echo "           修复后重试，或运行 bash scripts/link-mattpocock-skills.sh 重建链接" >&2
+    exit 1
+fi

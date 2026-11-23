@@ -42,3 +42,6 @@ writing-for-agents
 # Python 缓存
 __pycache__/
 *.pyc
+
+# 本地议题与规格（不进入版本库）
+.scratch/
