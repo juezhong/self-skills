@@ -1,204 +1,123 @@
-#!/bin/bash
-set -euo pipefail
-
-# 模板：为新子模块创建技能软链接、更新 .gitignore
-# 使用方法：全局替换 __SUBMODULE_NAME__，根据需要选择扁平/分类模式
+#!/usr/bin/env bash
+# 模板：为子模块 __SUBMODULE_NAME__ 建立技能链接。
+#
+# 链接逻辑在仓库根的 scripts/skill_links.py：它处理 Windows junction 兜底、
+# 路径规范化、幂等安装和 .gitignore 托管区块。本脚本只挑解释器并转交。
+#
+# Windows（MSYS/Cygwin/bash）只接受原生 Windows 解释器（os.sep 是反斜杠）：
+# POSIX 版 Python 写出的正斜杠目标，Windows 不解析。没有可用解释器时先建
+# .venv，优先用 uv。
 #
 # 用法:
-#   ./scripts/link-__SUBMODULE_NAME__.sh              # 全量刷新
-#   ./scripts/link-__SUBMODULE_NAME__.sh skill-a      # 增量追加
-#   ./scripts/link-__SUBMODULE_NAME__.sh --unlink     # 反向：取消链接
+#   bash scripts/link-__SUBMODULE_NAME__.sh              # 全量安装
+#   bash scripts/link-__SUBMODULE_NAME__.sh skill-a      # 只处理指定技能
+#   bash scripts/link-__SUBMODULE_NAME__.sh --unlink     # 删除本子模块的链接
+#   bash scripts/link-__SUBMODULE_NAME__.sh --check      # 检查链接与 .gitignore 是否一致
+#
+# 布局：分类结构（skills/engineering/...）设 CATEGORIES；扁平结构设为空字符串。
+set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SKILLS_DIR="$(dirname "$SCRIPT_DIR")"
+case "$0" in
+    */*) SCRIPT_DIR="${0%/*}" ;;
+    *) SCRIPT_DIR="." ;;
+esac
+SCRIPT_DIR="$(cd "$SCRIPT_DIR" && pwd)"
+SKILLS_DIR="${SCRIPT_DIR%/*}"
+SUBMODULE="__SUBMODULE_NAME__"
+CATEGORIES="engineering,productivity"
+CORE="$SCRIPT_DIR/skill_links.py"
+VENV_DIR="$SKILLS_DIR/.venv"
 
-cd "$SKILLS_DIR"
-
-SUBMODULE_PATH="submodules/__SUBMODULE_NAME__"
-INNER_BEGIN="# --- __SUBMODULE_NAME__ begin ---"
-INNER_END="# --- __SUBMODULE_NAME__ end ---"
-
-# ---- 反向操作：取消链接 ----
-if [ "${1:-}" = "--unlink" ]; then
-    echo "=== 取消软链接 ==="
-    removed=0
-    GITIGNORE="$SKILLS_DIR/.gitignore"
-    if [ -f "$GITIGNORE" ] && grep -qF "$INNER_BEGIN" "$GITIGNORE"; then
-        skills=$(sed -n "/$INNER_BEGIN/,/$INNER_END/p" "$GITIGNORE" | grep -v '^#')
-        for skill in $skills; do
-            if [ -L "$skill" ]; then
-                target=$(readlink "$skill")
-                if [[ "$target" == submodules/__SUBMODULE_NAME__/* ]]; then
-                    rm "$skill"
-                    removed=$((removed + 1))
-                    echo "  已删除 $skill"
-                fi
-            fi
-        done
-    fi
-    if [ $removed -eq 0 ] && [ -d "$SUBMODULE_PATH/skills" ]; then
-        echo "  gitignore 中无记录，扫描子模块目录..."
-        for dir in "$SUBMODULE_PATH/skills"/*/; do
-            is_skill_dir "$dir" || continue
-            name="$(basename "$dir")"
-            if [ -L "$name" ]; then
-                target=$(readlink "$name")
-                if [[ "$target" == submodules/__SUBMODULE_NAME__/* ]]; then
-                    rm "$name"
-                    removed=$((removed + 1))
-                    echo "  已删除 $name"
-                fi
-            fi
-        done
-    fi
-    echo "  共删除 ${removed} 个软链接"
-
-    echo ""
-    echo "=== 清理 .gitignore ==="
-    if [ -f "$GITIGNORE" ] && grep -qF "$INNER_BEGIN" "$GITIGNORE"; then
-        sed -i '' "/$INNER_BEGIN/,/$INNER_END/d" "$GITIGNORE"
-        echo "  已删除 __SUBMODULE_NAME__ 区块"
-    fi
-    echo ""
-    echo "=== 完成 ==="
-    exit 0
-fi
-
-if [ ! -d "$SUBMODULE_PATH/skills" ]; then
-    echo "错误: 子模块未初始化，请先执行: git submodule update --init $SUBMODULE_PATH"
+if [ ! -f "$CORE" ]; then
+    echo "error: 缺少 $CORE" >&2
+    echo "       从 add-skills-submodule 技能目录复制一份到仓库 scripts/ 下再运行。" >&2
     exit 1
 fi
 
-if [ $# -eq 0 ]; then
-    MODE="full"
-else
-    MODE="selective"
-fi
+is_native_python() {
+    "$1" -c 'import os,sys; sys.exit(0 if os.sep == chr(92) else 1)' >/dev/null 2>&1
+}
 
-echo "=== 创建软链接（模式: $MODE）==="
+needs_native_python() {
+    case "$(uname -s 2>/dev/null)" in
+        MINGW*|MSYS*|CYGWIN*) return 0 ;;
+    esac
+    return 1
+}
 
-SKILL_NAMES=()
+usable_python() {
+    [ -n "${1:-}" ] || return 1
+    if [ -x "$1" ]; then
+        :
+    elif ! command -v "$1" >/dev/null 2>&1; then
+        return 1
+    fi
+    if needs_native_python; then
+        is_native_python "$1"
+    else
+        "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1
+    fi
+}
 
-# 判定技能目录的标准：同时满足【是目录】且【包含 SKILL.md】
-is_skill_dir() { [ -d "$1" ] && [ -f "$1/SKILL.md" ]; }
-
-# ═══════════════════════════════════════════════════════
-# 模式 A：扁平结构（skills/ 下直接是技能目录）
-# 示例：agent-toolkit
-# ═══════════════════════════════════════════════════════
-# SUBMODULE_SKILLS="submodules/__SUBMODULE_NAME__/skills"
-#
-# if [ "$MODE" = "full" ]; then
-#     for dir in "$SUBMODULE_SKILLS"/*/; do
-#         is_skill_dir "$dir" || continue
-#         name="$(basename "$dir")"
-#         if [ -e "$name" ] || [ -L "$name" ]; then rm -rf "$name"; fi
-#         ln -s "$dir" "$name"; SKILL_NAMES+=("$name"); echo "  $name -> $dir"
-#     done
-# fi
-#
-# if [ "$MODE" = "selective" ]; then
-#     for skill in "$@"; do
-#         skill_dir="$SUBMODULE_SKILLS/${skill}"
-#         if ! is_skill_dir "$skill_dir"; then echo "  错误: 技能 '$skill' 不存在，跳过"; continue; fi
-#         if [ -e "$skill" ] || [ -L "$skill" ]; then rm -rf "$skill"; fi
-#         ln -s "$skill_dir" "$skill"; SKILL_NAMES+=("$skill"); echo "  $skill -> $skill_dir"
-#     done
-# fi
-
-# ═══════════════════════════════════════════════════════
-# 模式 B：分类结构（skills/engineering/、skills/productivity/ 等）
-# 示例：mattpocock-skills
-# ═══════════════════════════════════════════════════════
-SUBMODULE_SKILLS="submodules/__SUBMODULE_NAME__/skills"
-
-if [ "$MODE" = "full" ]; then
-    link_skills() {
-        local category="$1"
-        local sub_path="${SUBMODULE_SKILLS}/${category}"
-        if [ ! -d "$sub_path" ]; then echo "  [跳过] $category"; return; fi
-        for dir in "$sub_path"/*/; do
-            is_skill_dir "$dir" || continue
-            local name; name="$(basename "$dir")"
-            if [ -e "$name" ] || [ -L "$name" ]; then rm -rf "$name"; fi
-            ln -s "$dir" "$name"; SKILL_NAMES+=("$name"); echo "  $name -> $dir"
-        done
-    }
-    link_skills "engineering"
-    link_skills "productivity"
-fi
-
-if [ "$MODE" = "selective" ]; then
-    for skill in "$@"; do
-        found=false
-        for category in engineering productivity; do
-            skill_dir="${SUBMODULE_SKILLS}/${category}/${skill}"
-            if is_skill_dir "$skill_dir"; then
-                found=true
-                if [ -e "$skill" ] || [ -L "$skill" ]; then rm -rf "$skill"; fi
-                ln -s "$skill_dir" "$skill"; SKILL_NAMES+=("$skill"); echo "  $skill -> $skill_dir"
-                break
-            fi
-        done
-        if ! $found; then echo "  错误: 技能 '$skill' 不存在，跳过"; continue; fi
+venv_python() {
+    for candidate in "$VENV_DIR/Scripts/python.exe" "$VENV_DIR/bin/python.exe" "$VENV_DIR/bin/python"; do
+        if [ -x "$candidate" ] && usable_python "$candidate"; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
     done
-fi
+    return 1
+}
 
-echo ""
-echo "=== 更新 .gitignore ==="
-
-GITIGNORE="$SKILLS_DIR/.gitignore"
-
-OUTER_BEGIN="# === 技能软链接 begin ==="
-OUTER_END="# === 技能软链接 end ==="
-
-if [ ! -f "$GITIGNORE" ]; then touch "$GITIGNORE"; fi
-
-if ! grep -qF "$OUTER_BEGIN" "$GITIGNORE"; then
-    echo "" >> "$GITIGNORE"
-    echo "$OUTER_BEGIN" >> "$GITIGNORE"
-    echo "$OUTER_END" >> "$GITIGNORE"
-fi
-
-# ---- 全量模式：删除旧 block，重建 ----
-if [ "$MODE" = "full" ]; then
-    if grep -qF "$INNER_BEGIN" "$GITIGNORE"; then
-        sed -i '' "/$INNER_BEGIN/,/$INNER_END/d" "$GITIGNORE"
+ensure_venv() {
+    [ -d "$VENV_DIR" ] && return 0
+    if command -v uv >/dev/null 2>&1; then
+        uv venv "$VENV_DIR" >/dev/null 2>&1 && return 0
     fi
-    outer_end=$(grep -nF "$OUTER_END" "$GITIGNORE" | head -1 | cut -d: -f1)
-    tmpfile=$(mktemp)
-    { echo "$INNER_BEGIN"; printf '%s\n' "${SKILL_NAMES[@]}" | sort; echo "$INNER_END"; } > "$tmpfile"
-    sed -i '' "$((outer_end - 1))r $tmpfile" "$GITIGNORE"
-    rm -f "$tmpfile"
-    echo "  已将 ${#SKILL_NAMES[@]} 个技能名写入 .gitignore"
-fi
-
-# ---- 选择性模式：定位 INNER_END 行号，直接插入 ----
-if [ "$MODE" = "selective" ]; then
-    if ! grep -qF "$INNER_BEGIN" "$GITIGNORE"; then
-        outer_end=$(grep -nF "$OUTER_END" "$GITIGNORE" | head -1 | cut -d: -f1)
-        tmpfile=$(mktemp)
-        printf '%s\n' "$INNER_BEGIN" "$INNER_END" > "$tmpfile"
-        sed -i '' "$((outer_end - 1))r $tmpfile" "$GITIGNORE"
-        rm -f "$tmpfile"
-    fi
-
-    added=0
-    for skill in "${SKILL_NAMES[@]}"; do
-        if sed -n "/$INNER_BEGIN/,/$INNER_END/p" "$GITIGNORE" | grep -qxF "$skill"; then
-            echo "  [已存在] $skill，跳过"
+    for base in python3 python; do
+        command -v "$base" >/dev/null 2>&1 || continue
+        if needs_native_python && ! is_native_python "$base"; then
             continue
         fi
-        end_line=$(grep -nF "$INNER_END" "$GITIGNORE" | head -1 | cut -d: -f1)
-        sed -i '' "${end_line}i\\
-$skill
-" "$GITIGNORE"
-        added=$((added + 1))
+        "$base" -m venv "$VENV_DIR" >/dev/null 2>&1 && return 0
     done
-    echo "  新增 ${added} 个技能名写入 .gitignore"
+    return 1
+}
+
+PYTHON_BIN="${SKILL_LINKS_PYTHON:-}"
+PYTHON_ARGS=""
+
+if [ -z "$PYTHON_BIN" ]; then
+    PYTHON_BIN="$(venv_python || true)"
 fi
 
-echo ""
-echo "=== 完成 ==="
-echo "已创建软链接："
-ls -la "$SKILLS_DIR" | grep '^l' | awk '{print "  " $NF}'
+if [ -z "$PYTHON_BIN" ]; then
+    ensure_venv || true
+    PYTHON_BIN="$(venv_python || true)"
+fi
+
+if [ -z "$PYTHON_BIN" ]; then
+    for candidate in python3 python; do
+        if usable_python "$candidate"; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    done
+fi
+
+if [ -z "$PYTHON_BIN" ] && command -v py >/dev/null 2>&1 && usable_python py; then
+    PYTHON_BIN="py"
+    PYTHON_ARGS="-3"
+fi
+
+if [ -z "$PYTHON_BIN" ]; then
+    echo "error: 找不到可用的 Python 3（Windows 上必须是原生解释器）；" >&2
+    echo "       装一个 Python，或用 SKILL_LINKS_PYTHON 指定解释器。" >&2
+    exit 1
+fi
+
+if [ -n "$CATEGORIES" ]; then
+    exec "$PYTHON_BIN" $PYTHON_ARGS "$CORE" \
+        --repo "$SKILLS_DIR" --submodule "$SUBMODULE" --categories "$CATEGORIES" "$@"
+fi
+exec "$PYTHON_BIN" $PYTHON_ARGS "$CORE" --repo "$SKILLS_DIR" --submodule "$SUBMODULE" "$@"

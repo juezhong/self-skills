@@ -22,7 +22,7 @@ git submodule add <url> submodules/<name>
 | 结构 | 特征 | 遍历方式 |
 |------|------|----------|
 | **扁平** | `skills/` 下直接是技能目录 | `for dir in submodules/<name>/skills/*/` |
-| **分类** | `skills/engineering/`、`skills/productivity/` 等 | 复用 `link_skills()` 函数逐类遍历 |
+| **分类** | `skills/engineering/`、`skills/productivity/` 等 | `scripts/skill_links.py` 按分类遍历 |
 
 ### 3. 复制模板脚本
 
@@ -30,14 +30,19 @@ git submodule add <url> submodules/<name>
 cp add-skills-submodule/scripts/link-submodule-template.sh scripts/link-<name>.sh
 ```
 
+链接逻辑只有一份：仓库 `scripts/skill_links.py`。目标仓库还没有它时一并复制：
+
+```bash
+cp add-skills-submodule/scripts/skill_links.py scripts/skill_links.py
+```
+
 ### 4. 适配脚本
 
 **全局替换** `__SUBMODULE_NAME__` → 实际子模块名。
 
-**选择技能遍历模式（模板中已包含两种）：**
+**布局**：分类结构（`skills/engineering/...`）保留 `CATEGORIES="engineering,productivity"`；扁平结构把它改成空字符串 `CATEGORIES=""`。
 
-- **扁平**（默认已启用）：适用于 `skills/` 下直接是技能目录的情况，如 `agent-toolkit`
-- **分类**：适用于 `skills/engineering/`、`skills/productivity/` 等分组结构。将模板中模式 A 注释掉，取消模式 B 的注释
+不要在脚本里重写链接逻辑——Windows junction 兜底和路径规范化都在 `skill_links.py` 里。
 
 ### 5. 运行脚本
 
@@ -46,19 +51,19 @@ cp add-skills-submodule/scripts/link-submodule-template.sh scripts/link-<name>.s
 ```bash
 ./scripts/link-<name>.sh              # 全量刷新：链接子模块所有技能
 ./scripts/link-<name>.sh skill-a      # 增量追加：只链接指定技能
-./scripts/link-<name>.sh --unlink     # 反向：取消所有软链接，删除 gitignore 区块
+./scripts/link-<name>.sh --unlink     # 反向：取消所有软链接（不动 gitignore）
 ```
 
 | 模式 | 触发 | 行为 | gitignore |
 |------|------|------|-----------|
-| 全量 | 无参数 | 扫描子模块全部技能，全量重建 | 重建整个 inner block |
-| 增量 | 带参数 | 仅链接指定技能（不存在则报错跳过） | 定位 INNER_END 行，在前面插入 |
-| 反向 | `--unlink` | 取消所有软链接 + 删除 inner block | 范围删除 inner block |
+| 全量 | 无参数 | 扫描子模块全部技能，全量重建 | 整个子区块重写为本子模块的全部技能 |
+| 增量 | 带参数 | 仅重建指定技能（不存在则报错跳过） | 与原有登记取并集后重写 |
+| 反向 | `--unlink` | 只删除本子模块的链接 | 不修改 |
 
 脚本会自动：
 - 检查子模块是否已初始化（未初始化则报错提示，`--unlink` 除外）
-- 创建项目根目录下的技能软链接
-- 更新 `.gitignore`（追加子区块到统一托管块，不影响其他子模块）
+- 在项目根目录建立链接（Windows 上先试符号链接，建不了或解析不了就退回 junction）
+- 更新 `.gitignore`（只重写本子模块的子区块，不影响其他子模块）
 
 ### 6. 验证
 
